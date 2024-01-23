@@ -47,7 +47,7 @@ void I2SAudioMicrophone::start_() {
     return;  // Waiting for another i2s to return lock
   }
   i2s_driver_config_t config = {
-      .mode = (i2s_mode_t) (I2S_MODE_MASTER | I2S_MODE_RX),
+      .mode = (i2s_mode_t) (I2S_MODE_SLAVE | I2S_MODE_RX),
       .sample_rate = 16000,
       .bits_per_sample = this->bits_per_sample_,
       .channel_format = this->channel_,
@@ -55,10 +55,10 @@ void I2SAudioMicrophone::start_() {
       .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
       .dma_buf_count = 4,
       .dma_buf_len = 256,
-      .use_apll = true,
+      .use_apll = false,
       .tx_desc_auto_clear = false,
-      .fixed_mclk = 24576000,
-      .mclk_multiple = I2S_MCLK_MULTIPLE_DEFAULT,
+      // .fixed_mclk = 24576000,
+      // .mclk_multiple = I2S_MCLK_MULTIPLE_DEFAULT,
       .bits_per_chan = I2S_BITS_PER_CHAN_DEFAULT,
   };
 
