@@ -91,6 +91,7 @@ void I2SAudioSpeaker::player_task(void *params) {
   xQueueSend(this_speaker->event_queue_, &event, portMAX_DELAY);
 
   int16_t buffer[BUFFER_SIZE / 2];
+  int32_t buffer_32bit[BUFFER_SIZE / 4];  // 增加一个32位的缓冲区
 
   while (true) {
     if (xQueueReceive(this_speaker->buffer_queue_, &data_event, 100 / portTICK_PERIOD_MS) != pdTRUE) {
@@ -103,23 +104,55 @@ void I2SAudioSpeaker::player_task(void *params) {
     }
     size_t bytes_written;
 
-    memmove(buffer, data_event.data, data_event.len);
-    size_t remaining = data_event.len / 2;
-    size_t current = 0;
+    if (this_speaker->bits_per_sample_ == I2S_BITS_PER_SAMPLE_16BIT) {
+      memmove(buffer_16bit, data_event.data, data_event.len);
+      size_t remaining = data_event.len / 2;  // 对于16位样本
+      size_t current = 0;
 
-    while (remaining > 0) {
-      uint32_t sample = (buffer[current] << 16) | (buffer[current] & 0xFFFF);
-
-      esp_err_t err = i2s_write(this_speaker->parent_->get_port(), &sample, sizeof(sample), &bytes_written,
-                                (10 / portTICK_PERIOD_MS));
-      if (err != ESP_OK) {
-        event = {.type = TaskEventType::WARNING, .err = err};
-        xQueueSend(this_speaker->event_queue_, &event, portMAX_DELAY);
-        continue;
+      while (remaining > 0) {
+        uint32_t sample = (buffer_16bit[current] << 16) | (buffer_16bit[current] & 0xFFFF);
+        esp_err_t err = i2s_write(this_speaker->parent_->get_port(), &sample, sizeof(sample), &bytes_written,
+                                  (10 / portTICK_PERIOD_MS));
+        if (err != ESP_OK) {
+          event = {.type = TaskEventType::WARNING, .err = err};
+          xQueueSend(this_speaker->event_queue_, &event, portMAX_DELAY);
+          continue;
+        }
+        remaining--;
+        current++;
       }
-      remaining--;
-      current++;
+    } else if (this_speaker->bits_per_sample_ == I2S_BITS_PER_SAMPLE_32BIT) {
+      memmove(buffer_32bit, data_event.data, data_event.len);
+      size_t remaining = data_event.len / 4;  // 对于32位样本
+      size_t current = 0;
+
+      while (remaining > 0) {
+        uint32_t sample = buffer_32bit[current];
+        esp_err_t err = i2s_write(this_speaker->parent_->get_port(), &sample, sizeof(sample), &bytes_written,
+                                  (10 / portTICK_PERIOD_MS));
+        if (err != ESP_OK) {
+          event = {.type = TaskEventType::WARNING, .err = err};
+          xQueueSend(this_speaker->event_queue_, &event, portMAX_DELAY);
+          continue;
+        }
+        remaining--;
+        current++;
+      }
     }
+
+    // while (remaining > 0) {
+    //   uint32_t sample = (buffer[current] << 16) | (buffer[current] & 0xFFFF);
+
+    //   esp_err_t err = i2s_write(this_speaker->parent_->get_port(), &sample, sizeof(sample), &bytes_written,
+    //                             (10 / portTICK_PERIOD_MS));
+    //   if (err != ESP_OK) {
+    //     event = {.type = TaskEventType::WARNING, .err = err};
+    //     xQueueSend(this_speaker->event_queue_, &event, portMAX_DELAY);
+    //     continue;
+    //   }
+    //   remaining--;
+    //   current++;
+    // }
 
     event.type = TaskEventType::PLAYING;
     xQueueSend(this_speaker->event_queue_, &event, portMAX_DELAY);
