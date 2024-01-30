@@ -9,11 +9,11 @@
 #include "esphome/core/log.h"
 
 namespace esphome {
-namespace i2s_audio_xiao {
+namespace i2s_audio {
 
 static const size_t BUFFER_COUNT = 20;
 
-static const char *const TAG = "i2s_audio_xiao.speaker";
+static const char *const TAG = "i2s_audio.speaker";
 
 void I2SAudioSpeaker::setup() {
   ESP_LOGCONFIG(TAG, "Setting up I2S Audio Speaker...");
@@ -29,7 +29,7 @@ void I2SAudioSpeaker::start_() {
   }
   this->state_ = speaker::STATE_RUNNING;
 
-  xTaskCreate(I2SAudioSpeaker::player_task, "speaker_task", 8192, (void *) this, 0, &this->player_task_handle_);
+  xTaskCreate(I2SAudioSpeaker::player_task, "speaker_task", 8192, (void *) this, 1, &this->player_task_handle_);
 }
 
 void I2SAudioSpeaker::player_task(void *params) {
@@ -40,7 +40,7 @@ void I2SAudioSpeaker::player_task(void *params) {
   xQueueSend(this_speaker->event_queue_, &event, portMAX_DELAY);
 
   i2s_driver_config_t config = {
-      .mode = (i2s_mode_t) (I2S_MODE_SLAVE | I2S_MODE_TX),
+      .mode = (i2s_mode_t) (I2S_MODE_MASTER | I2S_MODE_TX),
       .sample_rate = 16000,
       .bits_per_sample = I2S_BITS_PER_SAMPLE_32BIT,
       .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
@@ -50,8 +50,8 @@ void I2SAudioSpeaker::player_task(void *params) {
       .dma_buf_len = 128,
       .use_apll = false,
       .tx_desc_auto_clear = true,
-      // .fixed_mclk = I2S_PIN_NO_CHANGE,
-      // .mclk_multiple = I2S_MCLK_MULTIPLE_DEFAULT,
+      .fixed_mclk = I2S_PIN_NO_CHANGE,
+      .mclk_multiple = I2S_MCLK_MULTIPLE_DEFAULT,
       .bits_per_chan = I2S_BITS_PER_CHAN_DEFAULT,
   };
 #if SOC_I2S_SUPPORTS_DAC
@@ -91,7 +91,7 @@ void I2SAudioSpeaker::player_task(void *params) {
   xQueueSend(this_speaker->event_queue_, &event, portMAX_DELAY);
 
   int16_t buffer[BUFFER_SIZE / 2];
-  int32_t buffer_32bit[BUFFER_SIZE / 4];  // 增加一个32位的缓冲区
+  int32_t buffer_32bit[BUFFER_SIZE / 4]; // 用于32位数据的缓冲区
 
   while (true) {
     if (xQueueReceive(this_speaker->buffer_queue_, &data_event, 100 / portTICK_PERIOD_MS) != pdTRUE) {
@@ -104,30 +104,33 @@ void I2SAudioSpeaker::player_task(void *params) {
     }
     size_t bytes_written;
 
-    if (this_speaker->bits_per_sample_ == I2S_BITS_PER_SAMPLE_16BIT) {
-      memmove(buffer_16bit, data_event.data, data_event.len);
-      size_t remaining = data_event.len / 2;  // 对于16位样本
-      size_t current = 0;
-
-      while (remaining > 0) {
-        uint32_t sample = (buffer_16bit[current] << 16) | (buffer_16bit[current] & 0xFFFF);
-        esp_err_t err = i2s_write(this_speaker->parent_->get_port(), &sample, sizeof(sample), &bytes_written,
-                                  (10 / portTICK_PERIOD_MS));
-        if (err != ESP_OK) {
-          event = {.type = TaskEventType::WARNING, .err = err};
-          xQueueSend(this_speaker->event_queue_, &event, portMAX_DELAY);
-          continue;
-        }
-        remaining--;
-        current++;
-      }
-    } else if (this_speaker->bits_per_sample_ == I2S_BITS_PER_SAMPLE_32BIT) {
+    if(this_speaker->bits_per_sample == I2S_BITS_PER_SAMPLE_32BIT){
+      // 当位深度为32位时的处理逻辑
       memmove(buffer_32bit, data_event.data, data_event.len);
-      size_t remaining = data_event.len / 4;  // 对于32位样本
+      size_t remaining = data_event.len / 4;
       size_t current = 0;
 
       while (remaining > 0) {
         uint32_t sample = buffer_32bit[current];
+        // 将16位样本扩展为32位样本
+        sample = (sample & 0xFFFF) << 16;
+        esp_err_t err = i2s_write(this_speaker->parent_->get_port(), &sample, sizeof(sample), &bytes_written, (10 / portTICK_PERIOD_MS));
+        if (err != ESP_OK) {
+          event = {.type = TaskEventType::WARNING, .err = err};
+          xQueueSend(this_speaker->event_queue_, &event, portMAX_DELAY);
+        }
+        remaining--;
+        current++;
+      }
+    }
+    else{
+      memmove(buffer, data_event.data, data_event.len);
+      size_t remaining = data_event.len / 2;
+      size_t current = 0;
+  
+      while (remaining > 0) {
+        uint32_t sample = (buffer[current] << 16) | (buffer[current] & 0xFFFF);
+  
         esp_err_t err = i2s_write(this_speaker->parent_->get_port(), &sample, sizeof(sample), &bytes_written,
                                   (10 / portTICK_PERIOD_MS));
         if (err != ESP_OK) {
@@ -139,20 +142,6 @@ void I2SAudioSpeaker::player_task(void *params) {
         current++;
       }
     }
-
-    // while (remaining > 0) {
-    //   uint32_t sample = (buffer[current] << 16) | (buffer[current] & 0xFFFF);
-
-    //   esp_err_t err = i2s_write(this_speaker->parent_->get_port(), &sample, sizeof(sample), &bytes_written,
-    //                             (10 / portTICK_PERIOD_MS));
-    //   if (err != ESP_OK) {
-    //     event = {.type = TaskEventType::WARNING, .err = err};
-    //     xQueueSend(this_speaker->event_queue_, &event, portMAX_DELAY);
-    //     continue;
-    //   }
-    //   remaining--;
-    //   current++;
-    // }
 
     event.type = TaskEventType::PLAYING;
     xQueueSend(this_speaker->event_queue_, &event, portMAX_DELAY);
@@ -255,7 +244,7 @@ size_t I2SAudioSpeaker::play(const uint8_t *data, size_t length) {
 
 bool I2SAudioSpeaker::has_buffered_data() const { return uxQueueMessagesWaiting(this->buffer_queue_) > 0; }
 
-}  // namespace i2s_audio_xiao
+}  // namespace i2s_audio
 }  // namespace esphome
 
 #endif  // USE_ESP32
