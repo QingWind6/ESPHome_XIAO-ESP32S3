@@ -50,8 +50,8 @@ void I2SAudioSpeaker::player_task(void *params) {
       .dma_buf_len = 128,
       .use_apll = false,
       .tx_desc_auto_clear = true,
-      // .fixed_mclk = I2S_PIN_NO_CHANGE,
-      // .mclk_multiple = I2S_MCLK_MULTIPLE_DEFAULT,
+      .fixed_mclk = I2S_PIN_NO_CHANGE,
+      .mclk_multiple = I2S_MCLK_MULTIPLE_DEFAULT,
       .bits_per_chan = I2S_BITS_PER_CHAN_DEFAULT,
   };
 #if SOC_I2S_SUPPORTS_DAC
@@ -90,7 +90,8 @@ void I2SAudioSpeaker::player_task(void *params) {
   event.type = TaskEventType::STARTED;
   xQueueSend(this_speaker->event_queue_, &event, portMAX_DELAY);
 
-  int16_t buffer[BUFFER_SIZE / 2];
+  // int16_t buffer[BUFFER_SIZE / 2];
+  int32_t buffer[BUFFER_SIZE / 4];  // 用于32位数据的缓冲区
 
   while (true) {
     if (xQueueReceive(this_speaker->buffer_queue_, &data_event, 100 / portTICK_PERIOD_MS) != pdTRUE) {
@@ -103,13 +104,17 @@ void I2SAudioSpeaker::player_task(void *params) {
     }
     size_t bytes_written;
 
+    // memmove(buffer, data_event.data, data_event.len);
+    // size_t remaining = data_event.len / 2;
+    // size_t current = 0;
     memmove(buffer, data_event.data, data_event.len);
-    size_t remaining = data_event.len / 2;
+    size_t remaining = data_event.len / 4;
     size_t current = 0;
 
     while (remaining > 0) {
       // uint32_t sample = (buffer[current] << 16) | (buffer[current] & 0xFFFF);
-      uint64_t sample = (buffer[current] << 48 | (buffer[current] << 16));
+      // uint64_t sample = (buffer[current] << 48 | (buffer[current] << 16));
+      uint32_t sample = buffer[current];
 
       esp_err_t err = i2s_write(this_speaker->parent_->get_port(), &sample, sizeof(sample), &bytes_written,
                                 (10 / portTICK_PERIOD_MS));
