@@ -13,7 +13,7 @@ namespace i2s_audio_xiao {
 
 static const size_t BUFFER_COUNT = 20;
 
-static const char *const TAG = "i2s_audio.speaker";
+static const char *const TAG = "i2s_audio_xiao.speaker";
 
 void I2SAudioSpeaker::setup() {
   ESP_LOGCONFIG(TAG, "Setting up I2S Audio Speaker...");
