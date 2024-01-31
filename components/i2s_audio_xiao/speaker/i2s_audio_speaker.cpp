@@ -9,7 +9,7 @@
 #include "esphome/core/log.h"
 
 namespace esphome {
-namespace i2s_audio {
+namespace i2s_audio_xiao {
 
 static const size_t BUFFER_COUNT = 20;
 
