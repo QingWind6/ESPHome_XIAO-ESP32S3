@@ -17,8 +17,7 @@ static const char *const TAG = "i2s_audio_xiao.speaker";
 
 void I2SAudioSpeaker::setup() {
   ESP_LOGCONFIG(TAG, "Setting up I2S Audio Speaker...");
-  ESP_LOGI(TAG, "setup");
-  
+
   this->buffer_queue_ = xQueueCreate(BUFFER_COUNT, sizeof(DataEvent));
   this->event_queue_ = xQueueCreate(BUFFER_COUNT, sizeof(TaskEvent));
 }
@@ -30,7 +29,7 @@ void I2SAudioSpeaker::start_() {
   }
   this->state_ = speaker::STATE_RUNNING;
 
-  xTaskCreate(I2SAudioSpeaker::player_task, "speaker_task", 8192, (void *) this, 1, &this->player_task_handle_);
+  xTaskCreate(I2SAudioSpeaker::player_task, "speaker_task", 8192, (void *) this, 0, &this->player_task_handle_);
 }
 
 void I2SAudioSpeaker::player_task(void *params) {
@@ -41,7 +40,7 @@ void I2SAudioSpeaker::player_task(void *params) {
   xQueueSend(this_speaker->event_queue_, &event, portMAX_DELAY);
 
   i2s_driver_config_t config = {
-      .mode = (i2s_mode_t) (I2S_MODE_SLAVE | I2S_MODE_TX),
+      .mode = (i2s_mode_t) (I2S_MODE_MASTER | I2S_MODE_TX),
       .sample_rate = 16000,
       .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
       .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
@@ -223,7 +222,7 @@ size_t I2SAudioSpeaker::play(const uint8_t *data, size_t length) {
 
 bool I2SAudioSpeaker::has_buffered_data() const { return uxQueueMessagesWaiting(this->buffer_queue_) > 0; }
 
-}  // namespace i2s_audio
+}  // namespace i2s_audio_xiao
 }  // namespace esphome
 
 #endif  // USE_ESP32
