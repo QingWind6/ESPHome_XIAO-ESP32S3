@@ -17,7 +17,8 @@ static const char *const TAG = "i2s_audio.speaker";
 
 void I2SAudioSpeaker::setup() {
   ESP_LOGCONFIG(TAG, "Setting up I2S Audio Speaker...");
-
+  ESP_LOGI(TAG, "setup");
+  
   this->buffer_queue_ = xQueueCreate(BUFFER_COUNT, sizeof(DataEvent));
   this->event_queue_ = xQueueCreate(BUFFER_COUNT, sizeof(TaskEvent));
 }
@@ -50,8 +51,8 @@ void I2SAudioSpeaker::player_task(void *params) {
       .dma_buf_len = 128,
       .use_apll = false,
       .tx_desc_auto_clear = true,
-      // .fixed_mclk = I2S_PIN_NO_CHANGE,
-      // .mclk_multiple = I2S_MCLK_MULTIPLE_DEFAULT,
+      .fixed_mclk = I2S_PIN_NO_CHANGE,
+      .mclk_multiple = I2S_MCLK_MULTIPLE_DEFAULT,
       .bits_per_chan = I2S_BITS_PER_CHAN_DEFAULT,
   };
 #if SOC_I2S_SUPPORTS_DAC
