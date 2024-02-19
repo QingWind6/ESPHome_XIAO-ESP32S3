@@ -83,7 +83,7 @@ void I2SAudioMicrophone::start_() {
     i2s_set_pin(this->parent_->get_port(), &pin_config);
   }
   this->state_ = microphone::STATE_RUNNING;
-  this->high_freq_.start();
+  // this->high_freq_.start();
 }
 
 void I2SAudioMicrophone::stop() {
@@ -101,7 +101,7 @@ void I2SAudioMicrophone::stop_() {
   i2s_driver_uninstall(this->parent_->get_port());
   this->parent_->unlock();
   this->state_ = microphone::STATE_STOPPED;
-  this->high_freq_.stop();
+  // this->high_freq_.stop();
 }
 
 size_t I2SAudioMicrophone::read(int16_t *buf, size_t len) {
@@ -123,9 +123,14 @@ size_t I2SAudioMicrophone::read(int16_t *buf, size_t len) {
     std::vector<int16_t> samples;
     size_t samples_read = bytes_read / sizeof(int32_t);
     samples.resize(samples_read);
+    // for (size_t i = 0; i < samples_read; i++) {
+    //   int32_t temp = reinterpret_cast<int32_t *>(buf)[i] >> 14;
+    //   samples[i] = clamp<int16_t>(temp, INT16_MIN, INT16_MAX);
+    // }
     for (size_t i = 0; i < samples_read; i++) {
-      int32_t temp = reinterpret_cast<int32_t *>(buf)[i] >> 14;
-      samples[i] = clamp<int16_t>(temp, INT16_MIN, INT16_MAX);
+      int32_t sample = reinterpret_cast<int32_t *>(buf)[i];
+      float sample_float = (float)sample / INT32_MAX;
+      samples[i] = (int16_t)(sample_float * INT16_MAX);
     }
     memcpy(buf, samples.data(), samples_read * sizeof(int16_t));
     return samples_read * sizeof(int16_t);
