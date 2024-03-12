@@ -21,15 +21,15 @@ api:
 ota:
 
 wifi:
-  ssid: JoJang_OpenWrt
-  password: "66666666"
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
 
-improv_serial:
+# improv_serial:
 
-esp32_improv:
-  authorizer: none
+# esp32_improv:
+#   authorizer: none
 
-captive_portal:
+# captive_portal:
 
 external_components:
   - source: github://QingWind6/ESPHome_XIAO-ESP32S3
