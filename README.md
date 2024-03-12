@@ -21,8 +21,8 @@ api:
 ota:
 
 wifi:
-  ssid: XXXXXX
-  password: "XXXXXXXX"
+  ssid: JoJang_OpenWrt
+  password: "66666666"
 
 improv_serial:
 
@@ -160,4 +160,15 @@ switch:
     on_turn_off:
       - voice_assistant.stop
       - lambda: id(assist).set_use_wake_word(false);
+
+  - platform: template
+    name: Use Listen Light
+    id: use_listen_light
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+    on_turn_on:
+      - script.execute: reset_led
+    on_turn_off:
+      - script.execute: reset_led
 ```
