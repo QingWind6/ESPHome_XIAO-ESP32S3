@@ -108,10 +108,11 @@ void I2SAudioSpeaker::player_task(void *params) {
     size_t current = 0;
 
     while (remaining > 0) {
-      uint32_t sample = (buffer[current] << 16) | (buffer[current] & 0xFFFF);
-      uint32_t samples[2] = {sample, sample};
+      // uint32_t sample = (buffer[current] << 16) | (buffer[current] & 0xFFFF);
+      // uint32_t samples[2] = {sample, sample};
+      uint16_t sample = buffer[current];
 
-      esp_err_t err = i2s_write(this_speaker->parent_->get_port(), &samples, sizeof(samples)*2, &bytes_written,
+      esp_err_t err = i2s_write(this_speaker->parent_->get_port(), &sample, sizeof(sample), &bytes_written,
                                 (10 / portTICK_PERIOD_MS));
       if (err != ESP_OK) {
         event = {.type = TaskEventType::WARNING, .err = err};
